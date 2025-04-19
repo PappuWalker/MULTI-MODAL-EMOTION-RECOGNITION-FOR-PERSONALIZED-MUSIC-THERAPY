@@ -1,0 +1,33 @@
+const XLSX = require('xlsx');
+const fs = require('fs');
+const path = require('path');
+
+// Create a new workbook
+const workbook = XLSX.utils.book_new();
+
+// Create a worksheet with headers
+const wsData = [
+  {
+    'Name': '',
+    'Pulse (BPM)': '',
+    'SpO2 (%)': '',
+    'Stress Score': '',
+    'Stress Level': '',
+    'Date': ''
+  }
+];
+
+const worksheet = XLSX.utils.json_to_sheet(wsData);
+XLSX.utils.book_append_sheet(workbook, worksheet, 'Health Records');
+
+// Make sure public directory exists
+const publicDir = path.join(__dirname, 'public');
+if (!fs.existsSync(publicDir)) {
+  fs.mkdirSync(publicDir);
+}
+
+// Write the workbook to a file
+const filePath = path.join(publicDir, 'health_records.xlsx');
+XLSX.writeFile(workbook, filePath);
+
+console.log(`Empty Excel file created at: ${filePath}`);

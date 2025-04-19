@@ -1,0 +1,247 @@
+/* Base Styles */
+.app {
+  width: 100%;
+  max-width: 95%;
+  margin: 0 auto;
+  padding: 2vmin;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 100%);
+  min-height: 100vh;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header */
+.header {
+  text-align: center;
+  margin-bottom: 3vh;
+  padding: 1vh 0;
+}
+
+.header h1 {
+  color: #2c3e50;
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  margin-bottom: 1.5vh;
+}
+
+.connection-status {
+  background: #2c3e50;
+  color: white;
+  padding: 1vh 2vw;
+  border-radius: 20px;
+  display: inline-block;
+  margin-bottom: 2vh;
+  font-size: clamp(0.9rem, 2vw, 1.2rem);
+}
+
+/* Readings Container */
+.readings-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 3vmin;
+  margin-bottom: 4vmin;
+  flex: 0 0 auto;
+}
+
+.reading-card {
+  background: white;
+  border-radius: 15px;
+  padding: 4vh 3vw;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+  text-align: center;
+  min-height: 25vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: transform 0.3s ease;
+}
+
+.reading-card:hover {
+  transform: translateY(-5px);
+}
+
+.reading-title {
+  color: #7f8c8d;
+  font-size: clamp(1.2rem, 2.5vw, 1.8rem);
+  margin-bottom: 2vmin;
+}
+
+.reading-value {
+  font-size: clamp(3rem, 8vw, 6rem);
+  font-weight: bold;
+  margin: 2vmin 0;
+  line-height: 1;
+}
+
+.pulse-value {
+  color: #e74c3c;
+}
+
+.spo2-value {
+  color: #3498db;
+}
+
+.reading-unit {
+  color: #95a5a6;
+  font-size: clamp(1.2rem, 2vw, 1.5rem);
+  margin-bottom: 1vh;
+}
+
+.reading-average {
+  color: #7f8c8d;
+  font-size: clamp(1rem, 1.8vw, 1.3rem);
+  font-weight: 500;
+}
+
+/* Charts Container */
+.charts-container {
+  background: white;
+  border-radius: 15px;
+  padding: 4vh 3vw;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+  margin-bottom: 4vmin;
+  flex: 1 1 auto;
+  min-height: 50vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-title {
+  color: #2c3e50;
+  margin-bottom: 3vh;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  text-align: center;
+}
+
+.charts-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 4vh;
+  flex: 1;
+  height: 100%;
+}
+
+.chart-section {
+  flex: 1;
+  min-height: 20vh;
+}
+
+.chart-section h3 {
+  font-size: clamp(1.2rem, 2.5vw, 1.6rem);
+  color: #34495e;
+  margin-bottom: 2vh;
+}
+
+/* Pulse Animation */
+.pulse-animation {
+  width: clamp(100px, 20vw, 150px);
+  height: clamp(100px, 20vw, 150px);
+  margin: 2vmin auto;
+  position: relative;
+}
+
+.pulse-circle {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: rgba(231, 76, 60, 0.2);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.3;
+  }
+  100% {
+    transform: scale(0.95);
+    opacity: 0.7;
+  }
+}
+
+/* No Data State */
+.no-data {
+  color: #95a5a6;
+  font-style: italic;
+  font-size: clamp(1.1rem, 3vw, 1.4rem);
+  margin: 3vmin 0;
+  height: 5vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Responsive Adjustments */
+@media (min-width: 768px) {
+  .charts-wrapper {
+    flex-direction: row;
+  }
+  
+  .chart-section {
+    width: 50%;
+  }
+}
+
+@media (min-width: 1200px) {
+  .app {
+    padding: 3vh 4vw;
+  }
+  
+  .readings-container {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .reading-card {
+    min-height: 30vh;
+    min-width: 78vh;
+  }
+  
+  .chart-section canvas {
+    max-height: 50vh;
+  }
+}
+
+@media (min-width: 1600px) {
+  .app {
+    max-width: 100%;
+  }
+  
+  .readings-container {
+    grid-template-columns: repeat(2, 1fr);
+    margin-bottom: 5vh;
+  }
+  
+  .reading-value {
+    font-size: 6rem;
+  }
+}
+
+@media (max-width: 767px) {
+  .app {
+    padding: 3vmin;
+    max-width: 100%;
+  }
+  
+  .readings-container {
+    grid-template-columns: 1fr;
+  }
+  
+  .reading-card {
+    min-height: 20vh;
+  }
+  
+  .reading-value {
+    margin: 1vmin 0;
+  }
+  
+  .chart-section {
+    min-height: 30vh;
+    margin-bottom: 4vh;
+  }
+}
