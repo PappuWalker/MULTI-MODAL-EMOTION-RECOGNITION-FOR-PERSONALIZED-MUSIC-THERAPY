@@ -1,7 +1,7 @@
 /* Base Styles */
 .app {
   width: 100%;
-  max-width: 95%;
+  max-width: 100%;
   margin: 0 auto;
   padding: 2vmin;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -10,6 +10,7 @@
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
+  overflow-x: hidden;
 }
 
 /* Header */
@@ -23,24 +24,6 @@
   color: #2c3e50;
   font-size: clamp(2rem, 5vw, 3.5rem);
   margin-bottom: 1.5vh;
-}
-
-.connection-status {
-  background: #2c3e50;
-  color: white;
-  padding: 1vh 2vw;
-  border-radius: 20px;
-  display: inline-block;
-  margin-bottom: 2vh;
-  font-size: clamp(0.9rem, 2vw, 1.2rem);
-}
-
-.connection-status.connected {
-  background-color: #27ae60;
-}
-
-.connection-status.disconnected {
-  background-color: #e74c3c;
 }
 
 /* Welcome Message */
@@ -334,68 +317,6 @@
   font-size: clamp(1.3rem, 2.7vw, 1.6rem);
 }
 
-.progress-container {
-  width: 80%;
-  margin: 1.5vh auto;
-  background-color: #ecf0f1;
-  border-radius: 10px;
-  overflow: hidden;
-  height: 20px;
-  box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
-  position: relative;
-}
-
-.progress-bar {
-  height: 100%;
-  width: 100%;
-  position: relative;
-  border-radius: 10px;
-  overflow: hidden;
-}
-
-.progress-bar > div {
-  height: 100%;
-  width: 0%;
-  background: linear-gradient(90deg, #3498db, #2980b9);
-  transition: width 0.2s linear;
-  border-radius: 10px;
-  position: absolute;
-  top: 0;
-  left: 0;
-  animation: progressPulse 2s infinite;
-}
-
-@keyframes progressPulse {
-  0% {
-    opacity: 0.8;
-  }
-  50% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0.8;
-  }
-}
-
-.stress-result {
-  background-color: #f8f9fa;
-  padding: 2vmin;
-  border-radius: 10px;
-  margin: 2vmin auto;
-  max-width: 80%;
-  text-align: center;
-}
-
-.stress-result h3 {
-  color: #2c3e50;
-  margin-bottom: 1vmin;
-}
-
-.stress-result p {
-  color: #7f8c8d;
-  font-size: clamp(1.1rem, 2vw, 1.3rem);
-}
-
 /* Stress level result styles */
 .high-stress {
   background-color: #ffdddd;
@@ -418,13 +339,72 @@
 }
 
 /* Responsive Adjustments */
+@media (min-width: 576px) {
+  .readings-container {
+    grid-template-columns: 1fr;
+  }
+  
+  .reading-card {
+    padding: 3vh 2vw;
+  }
+  
+  .reading-value {
+    font-size: clamp(2.5rem, 7vw, 4rem);
+  }
+
+  .chart-section {
+    min-height: 25vh;
+  }
+}
+
 @media (min-width: 768px) {
+  .app {
+    padding: 2vh 3vw;
+  }
+
+  .readings-container {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 2vmin;
+  }
+  
   .charts-wrapper {
     flex-direction: row;
+    gap: 3vh;
   }
   
   .chart-section {
     width: 50%;
+    min-height: 30vh;
+  }
+
+  .reading-value {
+    font-size: clamp(2.8rem, 7vw, 5rem);
+  }
+
+  .welcome-message {
+    max-width: 80%;
+  }
+}
+
+@media (min-width: 992px) {
+  .app {
+    padding: 2.5vh 3.5vw;
+  }
+  
+  .readings-container {
+    gap: 2.5vmin;
+  }
+  
+  .reading-card {
+    min-height: 25vh;
+  }
+  
+  .chart-section canvas {
+    max-height: 40vh;
+  }
+
+  .welcome-message {
+    max-width: 75%;
   }
 }
 
@@ -435,54 +415,131 @@
   
   .readings-container {
     grid-template-columns: repeat(2, 1fr);
+    gap: 3vmin;
   }
   
   .reading-card {
-    min-height: 30vh;
-    min-width: 78vh;
+    min-height: 28vh;
   }
   
   .chart-section canvas {
-    max-height: 50vh;
+    max-height: 45vh;
+  }
+
+  .reading-value {
+    font-size: clamp(3rem, 8vw, 6rem);
   }
 }
 
 @media (min-width: 1600px) {
   .app {
-    max-width: 100%;
+    max-width: 95%;
+    margin: 0 auto;
   }
   
   .readings-container {
     grid-template-columns: repeat(2, 1fr);
     margin-bottom: 5vh;
+    gap: 4vmin;
   }
   
   .reading-value {
-    font-size: 6rem;
+    font-size: clamp(3.5rem, 8vw, 6rem);
+  }
+
+  .welcome-message {
+    max-width: 70%;
+  }
+
+  .chart-section canvas {
+    max-height: 50vh;
   }
 }
 
-@media (max-width: 767px) {
+@media (max-width: 575px) {
   .app {
-    padding: 3vmin;
+    padding: 2vmin;
     max-width: 100%;
   }
   
   .readings-container {
     grid-template-columns: 1fr;
+    gap: 2vmin;
   }
   
   .reading-card {
-    min-height: 20vh;
+    min-height: 18vh;
+    padding: 3vh 4vw;
   }
   
   .reading-value {
+    font-size: clamp(2.2rem, 7vw, 3.5rem);
     margin: 1vmin 0;
   }
   
   .chart-section {
-    min-height: 30vh;
-    margin-bottom: 4vh;
+    min-height: 25vh;
+    margin-bottom: 3vh;
+  }
+
+  .header h1 {
+    font-size: clamp(1.8rem, 5vw, 2.5rem);
+  }
+
+  .welcome-message {
+    padding: 1.5vh 3vw;
+    margin-bottom: 2vh;
+  }
+
+  .welcome-message p {
+    font-size: clamp(0.9rem, 2vw, 1.1rem);
+  }
+
+  .charts-container {
+    padding: 3vh 3vw;
+  }
+  
+  .chart-title {
+    font-size: clamp(1.3rem, 3vw, 1.8rem);
+    margin-bottom: 2vh;
+  }
+
+  .music-player-container {
+    width: 90%;
+    left: 5%;
+    right: 5%;
+    bottom: 10px;
+  }
+}
+
+/* For really small screens */
+@media (max-width: 360px) {
+  .app {
+    padding: 1.5vmin;
+  }
+  
+  .reading-card {
+    padding: 2vh 3vw;
+    min-height: 15vh;
+  }
+  
+  .reading-value {
+    font-size: clamp(2rem, 6vw, 2.8rem);
+  }
+  
+  .header h1 {
+    font-size: clamp(1.5rem, 5vw, 2rem);
+    margin-bottom: 1vh;
+  }
+  
+  .user-input {
+    flex-direction: column;
+  }
+  
+  .user-input input, 
+  .user-input button {
+    width: 100%;
+    margin: 0.5vh 0;
   }
 }
 
@@ -536,4 +593,113 @@
   font-size: 1rem;
   color: #2c3e50;
   font-weight: bold;
+}
+
+/* Orientation specific styles */
+@media screen and (orientation: landscape) and (max-height: 500px) {
+  .app {
+    padding: 1vh 2vw;
+  }
+  
+  .header {
+    margin-bottom: 1vh;
+  }
+  
+  .header h1 {
+    font-size: clamp(1.5rem, 4vw, 2.5rem);
+    margin-bottom: 0.5vh;
+  }
+  
+  .welcome-message {
+    display: none; /* Hide welcome message in landscape to save space */
+  }
+  
+  .readings-container {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 2vmin;
+    margin-bottom: 2vmin;
+  }
+  
+  .reading-card {
+    min-height: auto;
+    padding: 1.5vh 2vw;
+  }
+  
+  .reading-value {
+    font-size: clamp(2rem, 5vw, 4rem);
+    margin: 0.5vh 0;
+  }
+  
+  .reading-unit {
+    margin-bottom: 0.5vh;
+  }
+  
+  .charts-container {
+    padding: 1.5vh 2vw;
+    margin-bottom: 2vmin;
+  }
+  
+  .chart-title {
+    font-size: clamp(1.2rem, 2.5vw, 1.5rem);
+    margin-bottom: 1vh;
+  }
+  
+  .charts-wrapper {
+    flex-direction: row;
+    gap: 2vh;
+  }
+  
+  .chart-section {
+    min-height: 20vh;
+  }
+  
+  .music-player-container {
+    max-width: 250px;
+    right: 10px;
+    bottom: 10px;
+  }
+}
+
+/* Remove progress container and bar styles */
+.progress-container {
+  display: none;
+}
+
+.progress-bar {
+  display: none;
+}
+
+.progress-bar > div {
+  display: none;
+}
+
+@keyframes progressPulse {
+  0% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.stress-result {
+  background-color: #f8f9fa;
+  padding: 2vmin;
+  border-radius: 10px;
+  margin: 2vmin auto;
+  max-width: 80%;
+  text-align: center;
+}
+
+.stress-result h3 {
+  color: #2c3e50;
+  margin-bottom: 1vmin;
+}
+
+.stress-result p {
+  color: #7f8c8d;
+  font-size: clamp(1.1rem, 2vw, 1.3rem);
 }

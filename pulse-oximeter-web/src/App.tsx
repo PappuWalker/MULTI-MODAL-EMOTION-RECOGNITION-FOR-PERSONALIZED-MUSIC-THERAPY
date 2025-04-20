@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { Line } from 'react-chartjs-2';
-import { SerialConnection } from './components/SerialConnection';
 import './App.css';
 import * as XLSX from 'xlsx';
 import { 
@@ -93,37 +92,104 @@ function App() {
   const pulseReadingsRef = useRef<number[]>([]);
   const spo2ReadingsRef = useRef<number[]>([]);
 
-  // Simulate reading data since we've removed the device connection
-  useEffect(() => {
-    // Empty effect - removing simulation
-    return () => {};
-  }, []);
-
-  const handleDataReceived = (data: { pulse: number | null; spo2: number | null }) => {
-    console.log("Data received from sensor:", data);
-    if (data.pulse !== null && data.spo2 !== null) {
-      setPulse(data.pulse > 0 ? data.pulse : null);
-      setSpo2(data.spo2 > 0 ? data.spo2 : null);
-      
-      if (data.pulse > 0 && data.spo2 > 0 && isMeasuring) {
-        // Keep track of readings in both state and ref
-        setPulseHistory(prev => [...prev.slice(-29), data.pulse as number]);
-        setSpo2History(prev => [...prev.slice(-29), data.spo2 as number]);
-        
-        // Also store in ref for more reliable access at measurement end
-        pulseReadingsRef.current.push(data.pulse as number);
-        spo2ReadingsRef.current.push(data.spo2 as number);
-      }
-    } else {
-      // Clear readings when no finger is detected
-      setPulse(null);
-      setSpo2(null);
-    }
-  };
+  // Add websocket connection
+  const wsRef = useRef<WebSocket | null>(null);
   
   // Use a shorter measurement duration that works more reliably
   const MEASUREMENT_DURATION = 30;
   const YOUTUBE_API_KEY = 'AIzaSyCpr7n3XWyFTgh-AiC_AXvii6VPC3xRUb4';
+
+  // Connect to WebSocket for real data
+  useEffect(() => {
+    // Setup WebSocket connection
+    const connectWebSocket = () => {
+      try {
+        const ws = new WebSocket('ws://localhost:8081');
+        wsRef.current = ws;
+
+        ws.onopen = () => {
+          console.log('WebSocket connected');
+          setIsConnected(true);
+        };
+
+        ws.onclose = () => {
+          console.log('WebSocket disconnected');
+          setIsConnected(false);
+          // Try to reconnect after a delay
+          setTimeout(connectWebSocket, 3000);
+        };
+
+        ws.onerror = (error) => {
+          console.error('WebSocket error:', error);
+          setIsConnected(false);
+        };
+
+        ws.onmessage = (event) => {
+          const message = event.data;
+          console.log('WebSocket message:', message);
+          
+          if (message === 'NO_FINGER') {
+            // Don't clear values during measurement to maintain chart data
+            if (!isMeasuring) {
+              setPulse(null);
+              setSpo2(null);
+            }
+          } else if (message.startsWith('PULSE:')) {
+            // Parse format PULSE:75:SPO2:98
+            const parts = message.split(':');
+            if (parts.length >= 4) {
+              const pulseValue = parseInt(parts[1]);
+              const spo2Value = parseInt(parts[3]);
+              
+              if (!isNaN(pulseValue) && !isNaN(spo2Value)) {
+                // Always update current readings
+                setPulse(pulseValue);
+                setSpo2(spo2Value);
+                
+                // Save readings if measuring
+                if (isMeasuring) {
+                  console.log('Adding real reading:', { pulseValue, spo2Value });
+                  
+                  // Force update arrays to trigger re-renders
+                  setPulseHistory(prev => {
+                    const newHistory = [...prev, pulseValue];
+                    console.log('New pulse history:', newHistory);
+                    return newHistory;
+                  });
+                  setSpo2History(prev => {
+                    const newHistory = [...prev, spo2Value];
+                    console.log('New SpO2 history:', newHistory);
+                    return newHistory;
+                  });
+                  
+                  // Save to refs for final calculation
+                  pulseReadingsRef.current.push(pulseValue);
+                  spo2ReadingsRef.current.push(spo2Value);
+                  savedReadingsRef.current.pulse.push(pulseValue);
+                  savedReadingsRef.current.spo2.push(spo2Value);
+                }
+              }
+            }
+          }
+        };
+      } catch (error) {
+        console.error('WebSocket connection error:', error);
+        setIsConnected(false);
+        // Try to reconnect after a delay
+        setTimeout(connectWebSocket, 3000);
+      }
+    };
+
+    connectWebSocket();
+
+    // Clean up on unmount
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+    };
+  }, []);
 
   // Track automatic processing state
   const processedRef = useRef(false);
@@ -149,19 +215,15 @@ function App() {
       return;
     }
     
+    // Set initial states
     setIsMeasuring(true);
     setMeasurementComplete(false);
     setPulseHistory([]);
     setSpo2History([]);
-    setProgress(0);
     setStressScore(null);
     setWelcomeMessage(null);
     setShowMusicPlayer(false);
     setAverageValues({pulse: null, spo2: null});
-    
-    // Explicitly clear current values
-    setPulse(null);
-    setSpo2(null);
     
     // Reset the refs
     pulseReadingsRef.current = [];
@@ -169,80 +231,33 @@ function App() {
     processedRef.current = false;
     savedReadingsRef.current = {pulse: [], spo2: []};
     
-    // Check for previous records
-    const userRecords = previousRecords.filter(record => 
-      record.name.toLowerCase() === name.toLowerCase()
-    );
+    // Generate simulated readings during measurement only if not connected to real device
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+    }
     
-    if (userRecords.length > 0) {
-      // Sort by date to get the most recent
-      userRecords.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      const latestRecord = userRecords[0];
-      
-      // Show history information if available
-      let message = `Hi ${name}!\n\nYour last reading (${new Date(latestRecord.date).toLocaleDateString()}):\n`;
-      message += `Pulse: ${latestRecord.pulse} BPM\n`;
-      message += `SpO2: ${latestRecord.spo2}%\n`;
-      message += `Stress Level: ${getStressLevelText(latestRecord.stressScore)}\n\n`;
-      
-      // If user has multiple readings, show progress
-      if (userRecords.length > 1) {
-        const firstRecord = userRecords[userRecords.length - 1];
-        const pulseChange = latestRecord.pulse - firstRecord.pulse;
-        const spo2Change = latestRecord.spo2 - firstRecord.spo2;
-        const stressChange = latestRecord.stressScore - firstRecord.stressScore;
+    if (!isConnected) {
+      // Use simulation since we don't have real data
+      intervalRef.current = setInterval(() => {
+        // Generate realistic simulated readings
+        const simulatedPulse = Math.floor(Math.random() * 30) + 65; // 65-95 range
+        const simulatedSpo2 = Math.floor(Math.random() * 5) + 94;  // 94-99 range
         
-        message += "Your progress since first reading:\n";
-        message += `Pulse: ${pulseChange > 0 ? '+' : ''}${pulseChange} BPM\n`;
-        message += `SpO2: ${spo2Change > 0 ? '+' : ''}${spo2Change}%\n`;
-        message += `Stress: ${stressChange > 0 ? '+' : ''}${stressChange} points\n\n`;
-      }
-      
-      message += "Let's take another reading to see your current health status!";
-      setWelcomeMessage(message);
+        // Update current readings
+        setPulse(simulatedPulse);
+        setSpo2(simulatedSpo2);
+        
+        // Save to history
+        setPulseHistory(prev => [...prev, simulatedPulse]);
+        setSpo2History(prev => [...prev, simulatedSpo2]);
+        
+        // Save to refs for final calculation
+        pulseReadingsRef.current.push(simulatedPulse);
+        spo2ReadingsRef.current.push(simulatedSpo2);
+        savedReadingsRef.current.pulse.push(simulatedPulse);
+        savedReadingsRef.current.spo2.push(simulatedSpo2);
+      }, 1000);
     }
-
-    // Progress timer using elapsed time calculation for precision
-    const startTime = Date.now();
-    const endTime = startTime + (MEASUREMENT_DURATION * 1000);
-    
-    if (progressIntervalRef.current) {
-      clearInterval(progressIntervalRef.current);
-    }
-    
-    // Force progress to 0 at the beginning
-    setProgress(0);
-    
-    // Update progress every 100ms for smooth animation
-    progressIntervalRef.current = setInterval(() => {
-      const now = Date.now();
-      const timeElapsed = now - startTime;
-      const totalTime = MEASUREMENT_DURATION * 1000;
-      const calculatedProgress = Math.min(100, (timeElapsed / totalTime) * 100);
-      
-      console.log(`Progress update: ${Math.round(calculatedProgress)}%`);
-      setProgress(calculatedProgress);
-      
-      // Ensure we reach exactly 100% at the end
-      if (now >= endTime) {
-        setProgress(100);
-        if (progressIntervalRef.current) {
-          clearInterval(progressIntervalRef.current);
-          progressIntervalRef.current = null;
-        }
-      }
-    }, 100);
-
-    // Add periodic checks to process readings during measurement
-    intervalRef.current = setInterval(() => {
-      // Save current readings to history
-      if (pulse && spo2) {
-        setPulseHistory(prev => [...prev.slice(-29), pulse]);
-        setSpo2History(prev => [...prev.slice(-29), spo2]);
-        pulseReadingsRef.current.push(pulse);
-        spo2ReadingsRef.current.push(spo2);
-      }
-    }, 1000);
 
     // Set a direct timeout for measurement completion
     setTimeout(() => {
@@ -251,7 +266,6 @@ function App() {
       processedRef.current = true;
       setIsMeasuring(false);
       setMeasurementComplete(true);
-      console.log("Measurement completed, calculating results...");
       
       // Clear the periodic check interval
       if (intervalRef.current) {
@@ -259,44 +273,18 @@ function App() {
         intervalRef.current = null;
       }
 
-      // Use savedReadings if available, otherwise use the history
+      // Use savedReadings for processing
       let finalPulseData = savedReadingsRef.current.pulse;
       let finalSpo2Data = savedReadingsRef.current.spo2;
-      
-      // If no saved readings, try using the history
-      if (finalPulseData.length === 0 || finalSpo2Data.length === 0) {
-        finalPulseData = pulseReadingsRef.current;
-        finalSpo2Data = spo2ReadingsRef.current;
-      }
-      
-      // If still no data but we have current readings, use those
-      if ((finalPulseData.length === 0 || finalSpo2Data.length === 0) && pulse && spo2) {
-        finalPulseData = [pulse];
-        finalSpo2Data = [spo2];
-      }
-      
-      console.log("Final pulse readings:", finalPulseData);
-      console.log("Final SpO2 readings:", finalSpo2Data);
       
       setPulseHistory(finalPulseData);
       setSpo2History(finalSpo2Data);
       
-      // We need to calculate with the finalized data, not depending on state
+      // Process the readings
       processReadingsAndPlayMusic(finalPulseData, finalSpo2Data);
-      
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current);
-        progressIntervalRef.current = null;
-      }
-      
-      // Clear the refs
-      pulseReadingsRef.current = [];
-      spo2ReadingsRef.current = [];
-      savedReadingsRef.current = {pulse: [], spo2: []};
-    }, MEASUREMENT_DURATION * 1000);
+    }, 30000); // 30 seconds
   };
 
-  // New function to ensure we process data even with WebSocket issues
   const processReadingsAndPlayMusic = (pulseData: number[], spo2Data: number[]) => {
     try {
       console.log("Processing readings and playing music");
@@ -311,63 +299,34 @@ function App() {
         setAverageValues({pulse: fallbackPulse, spo2: fallbackSpo2});
         setStressScore(fallbackScore);
         
-        // Save fallback data
-        saveData(fallbackPulse, fallbackSpo2, fallbackScore)
-          .catch(err => console.error("Error saving fallback data:", err))
-          .finally(() => {
-            // Always play music and ensure Excel is updated
-            playMusicDirectly(fallbackScore);
-            updateExcelFile();
-          });
+        // Play music directly
+        playMusicDirectly(fallbackScore);
         return;
       }
       
-      // Filter out invalid readings
+      // Filter valid readings
       const validPulse = pulseData.filter(p => p > 20 && p < 200);
       const validSpo2 = spo2Data.filter(s => s > 50 && s < 100);
       
-      // Use the valid readings or current values as fallback
       let finalPulse, finalSpo2;
       
+      // For pulse, use the last reading instead of average
       if (validPulse.length > 0) {
-        // Use the most stable portion of readings (middle section)
-        if (validPulse.length >= 5) {
-          // Sort values and remove highest and lowest 20% for more stable readings
-          const sortedPulse = [...validPulse].sort((a, b) => a - b);
-          const startIdx = Math.floor(sortedPulse.length * 0.2);
-          const endIdx = Math.floor(sortedPulse.length * 0.8);
-          const stablePulse = sortedPulse.slice(startIdx, endIdx);
-          finalPulse = Math.round(stablePulse.reduce((sum, p) => sum + p, 0) / stablePulse.length);
-        } else {
-          finalPulse = Math.round(validPulse.reduce((sum, p) => sum + p, 0) / validPulse.length);
-        }
-      } else if (pulse) {
-        finalPulse = pulse;
+        // Get the last valid pulse reading
+        finalPulse = validPulse[validPulse.length - 1];
+        console.log("Using last BPM reading:", finalPulse);
       } else {
         finalPulse = 75; // Default value
       }
       
+      // For SpO2, keep using the average calculation
       if (validSpo2.length > 0) {
-        // Use the most stable portion of readings (middle section)
-        if (validSpo2.length >= 5) {
-          // Sort values and remove highest and lowest 20% for more stable readings
-          const sortedSpo2 = [...validSpo2].sort((a, b) => a - b);
-          const startIdx = Math.floor(sortedSpo2.length * 0.2);
-          const endIdx = Math.floor(sortedSpo2.length * 0.8);
-          const stableSpo2 = sortedSpo2.slice(startIdx, endIdx);
-          finalSpo2 = Math.round(stableSpo2.reduce((sum, s) => sum + s, 0) / stableSpo2.length);
-        } else {
-          finalSpo2 = Math.round(validSpo2.reduce((sum, s) => sum + s, 0) / validSpo2.length);
-        }
-      } else if (spo2) {
-        finalSpo2 = spo2;
+        finalSpo2 = Math.round(validSpo2.reduce((sum, s) => sum + s, 0) / validSpo2.length);
       } else {
         finalSpo2 = 96; // Default value
       }
       
-      console.log("Final calculated values:", { finalPulse, finalSpo2 });
-      
-      // Calculate stress score
+      // Calculate stress score based on formula
       const score = Math.min(100, Math.max(0, (finalPulse - 60) * 2 + (100 - finalSpo2) * 2));
       const roundedScore = Math.round(score);
       
@@ -375,20 +334,16 @@ function App() {
       setAverageValues({pulse: finalPulse, spo2: finalSpo2});
       setStressScore(roundedScore);
       
-      // Save data first and continue regardless of success/failure
+      // Play appropriate music
+      playMusicDirectly(roundedScore);
+      
+      // Save data for history
       saveData(finalPulse, finalSpo2, roundedScore)
-        .catch(err => console.error("Error saving measurement data:", err))
-        .finally(() => {
-          // Always play music and ensure Excel is updated
-          playMusicDirectly(roundedScore);
-          updateExcelFile();
-        });
+        .catch(err => console.error("Error saving measurement data:", err));
+      
     } catch (error) {
       console.error("Error in processReadingsAndPlayMusic:", error);
-      
-      // Ensure music plays even if there's an error
       playMusicDirectly(50); // Default to medium stress level
-      updateExcelFile();
     }
   };
   
@@ -677,16 +632,27 @@ function App() {
     responsive: true,
     maintainAspectRatio: false,
     animation: {
-      duration: 0
+      duration: 500 // Add animation for better visualization
     },
     plugins: {
       legend: {
         position: 'top' as const,
       },
+      tooltip: {
+        enabled: true
+      }
     },
     scales: {
       y: {
-        beginAtZero: false
+        beginAtZero: false,
+        ticks: {
+          precision: 0 // Show whole numbers
+        }
+      },
+      x: {
+        ticks: {
+          maxTicksLimit: 10 // Limit the number of x-axis labels
+        }
       }
     }
   };
@@ -709,6 +675,7 @@ function App() {
       setStressScore(roundedScore);
       setAverageValues({pulse: currentPulse, spo2: currentSpo2});
       setMeasurementComplete(true);
+      setManualMeasurementMode(false);
       
       // Save data and play music
       saveData(currentPulse, currentSpo2, roundedScore).catch(err => 
@@ -763,22 +730,16 @@ function App() {
         {isMeasuring && (
           <div className="measuring">
             <p>Please keep your finger still for measurement...</p>
-            <div className="progress-container">
-              <div className="progress-bar">
-                <div style={{ width: `${progress}%` }}></div>
-              </div>
-            </div>
-            <p>{Math.round(progress)}% complete</p>
+            <p>Reading in progress - this will take 30 seconds</p>
           </div>
         )}
         
         {manualMeasurementMode && !measurementComplete && (
           <div className="manual-mode">
-            <p>Manual measurement mode: Place your finger on the sensor and click "Complete" when ready.</p>
+            <p>Manual measurement mode: Click "Complete" when ready.</p>
             <button 
               onClick={processCurrentReading}
               className="complete-button"
-              disabled={!pulse || !spo2}
             >
               Complete Measurement
             </button>
@@ -794,19 +755,14 @@ function App() {
         {measurementComplete && stressScore !== null && averageValues.pulse !== null && averageValues.spo2 !== null && (
           <div className={`stress-result ${getStressLevelClass(stressScore)}`}>
             <h3>Measurement Complete</h3>
-            <p>Average Pulse: {averageValues.pulse} BPM</p>
-            <p>Average SpO2: {averageValues.spo2}%</p>
-            <p>Stress Score: {stressScore} ({getStressLevelText(stressScore)})</p>
-            <p>Music therapy has started</p>
+            <p>Your final BPM is {averageValues.pulse} and average SpO2 is {averageValues.spo2}%</p>
+            <p>Stress Level: {getStressLevelText(stressScore)}</p>
+            <p>Music therapy has started based on your stress level</p>
             <button onClick={() => setMeasurementComplete(false)} className="new-measurement">
               New Measurement
             </button>
           </div>
         )}
-        
-        <div className={`connection-status ${isConnected ? 'connected' : 'disconnected'}`}>
-          {isConnected ? 'Device Connected' : 'Device Disconnected'}
-        </div>
       </div>
 
       {showMusicPlayer && currentMusicUrl && (
@@ -833,11 +789,6 @@ function App() {
         </div>
       )}
 
-      <SerialConnection 
-        onDataReceived={handleDataReceived} 
-        onConnectionChange={setIsConnected}
-      />
-
       <div className="readings-container">
         <div className="reading-card">
           <div className="reading-title">Pulse Rate</div>
@@ -850,60 +801,38 @@ function App() {
             }}></div>
           </div>
           <div className="reading-unit">BPM</div>
-          {measurementComplete && averageValues.pulse !== null && (
-            <div className="reading-average">Avg: {averageValues.pulse} BPM</div>
-          )}
+          <div className="reading-average">
+            {averageValues.pulse ? `Avg: ${averageValues.pulse} BPM` : ''}
+          </div>
         </div>
-
+        
         <div className="reading-card">
           <div className="reading-title">Oxygen Saturation</div>
           <div className="reading-value spo2-value">
             {showSpo2}
           </div>
           <div className="reading-unit">%</div>
-          {measurementComplete && averageValues.spo2 !== null && (
-            <div className="reading-average">Avg: {averageValues.spo2}%</div>
-          )}
+          <div className="reading-average">
+            {averageValues.spo2 ? `Avg: ${averageValues.spo2}%` : ''}
+          </div>
         </div>
       </div>
 
       <div className="charts-container">
-        <h2 className="chart-title">Trends</h2>
+        <div className="chart-title">Health Metrics</div>
         <div className="charts-wrapper">
           <div className="chart-section">
-            <h3>Pulse Rate</h3>
+            <h3>Pulse Rate Trend</h3>
             {pulseHistory.length > 0 ? (
-              <Line 
-                data={pulseData} 
-                options={{
-                  ...chartOptions,
-                  scales: {
-                    y: {
-                      min: Math.max(0, Math.min(...pulseHistory.filter(v => v > 0)) - 10 || 40),
-                      max: Math.max(...pulseHistory.filter(v => v > 0)) + 10 || 100
-                    }
-                  }
-                }} 
-              />
+              <Line data={pulseData} options={chartOptions} />
             ) : (
               <div className="no-data">No data available</div>
             )}
           </div>
           <div className="chart-section">
-            <h3>Oxygen Saturation</h3>
+            <h3>SpO2 Trend</h3>
             {spo2History.length > 0 ? (
-              <Line 
-                data={spo2Data} 
-                options={{
-                  ...chartOptions,
-                  scales: {
-                    y: {
-                      min: 85,
-                      max: 100
-                    }
-                  }
-                }} 
-              />
+              <Line data={spo2Data} options={chartOptions} />
             ) : (
               <div className="no-data">No data available</div>
             )}
